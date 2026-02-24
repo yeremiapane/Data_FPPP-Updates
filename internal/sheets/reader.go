@@ -3,6 +3,7 @@ package sheets
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
 	"time"
 
@@ -11,6 +12,10 @@ import (
 
 	"google.golang.org/api/sheets/v4"
 )
+
+// hariRegex matches the word "hari" in any casing (e.g. hari, Hari, HARI),
+// including any surrounding whitespace.
+var hariRegex = regexp.MustCompile(`(?i)\s*hari\s*`)
 
 type Reader struct {
 	srv     *sheets.Service
@@ -69,6 +74,14 @@ func (r *Reader) ReadFormMaster() ([]model.FPPPRecord, error) {
 		if strings.EqualFold(waktuProduksi, "null") {
 			waktuProduksi = ""
 		}
+
+		// Jika nilai mengandung keyword khusus, gunakan perhitungan dari tanggal
+		if shouldFallbackToCalc(waktuProduksi) {
+			waktuProduksi = ""
+		}
+
+		// Normalize: remove "hari" suffix and replace "ASAP" with 21
+		waktuProduksi = normalizeWaktuProduksi(waktuProduksi)
 		if strings.EqualFold(deadline, "null") {
 			deadline = ""
 		}
@@ -88,6 +101,9 @@ func (r *Reader) ReadFormMaster() ([]model.FPPPRecord, error) {
 		if waktuProduksi == "" {
 			waktuProduksi = calcWaktuProduksi(tglFPPP, deadline)
 		}
+
+		// Final normalize after possible fallback calculation
+		waktuProduksi = normalizeWaktuProduksi(waktuProduksi)
 
 		records = append(records, model.FPPPRecord{
 			BusinessID:         bid,
@@ -143,7 +159,43 @@ func calcWaktuProduksi(tglFPPP, deadline string) string {
 	}
 
 	days := int(math.Round(t2.Sub(t1).Hours() / 24))
-	return fmt.Sprintf("%d hari", days)
+	return fmt.Sprintf("%d", days)
+}
+
+// shouldFallbackToCalc returns true when the raw Waktu Produksi value from the
+// sheet should be discarded and recalculated from (Deadline Pengiriman - Tgl FPPP).
+// Triggers:
+//   - "ASAP <extra>"  : ASAP diikuti teks tambahan (mis. "ASAP 2 minggu")
+//   - "Custom"        : nilai bersifat kustom / tidak standar
+//   - "MAXIMAL"       : nilai batas maksimal
+//   - "KERJA"         : mengacu hari kerja, bukan hari kalender
+func shouldFallbackToCalc(v string) bool {
+	upper := strings.ToUpper(strings.TrimSpace(v))
+	if upper == "" {
+		return false
+	}
+	// "ASAP xxx" — ASAP diikuti spasi dan teks lain (bukan pure "ASAP")
+	if strings.HasPrefix(upper, "ASAP ") {
+		return true
+	}
+	for _, keyword := range []string{"CUSTOM", "MAXIMAL", "KERJA", "(ASAP)"} {
+		if strings.Contains(upper, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+// normalizeWaktuProduksi applies two rules:
+//  1. Removes the word "hari" (any casing: hari/Hari/HARI) so only the number remains.
+//  2. Replaces "ASAP" (case-insensitive) with "21".
+func normalizeWaktuProduksi(v string) string {
+	if strings.EqualFold(strings.TrimSpace(v), "asap") {
+		return "21"
+	}
+	// Remove all occurrences of "hari" regardless of casing, including surrounding spaces
+	v = hariRegex.ReplaceAllString(v, "")
+	return strings.TrimSpace(v)
 }
 
 // ReadComments reads the Comment sheet and returns two maps keyed by business_id:
