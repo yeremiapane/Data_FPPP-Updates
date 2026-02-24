@@ -8,3 +8,5 @@ credentials/
 *.dylib
 *.test
 *.out
+
+.claude/
