@@ -7,6 +7,8 @@ type FPPPRecord struct {
 	TglFPPP            string
 	NoFPPP             string
 	DeadlinePengiriman string
+	WaktuProduksi      string
+	FinanceKlaes       string
 	EndTime            string
 }
 
@@ -18,6 +20,8 @@ func (r *FPPPRecord) ToRow() []interface{} {
 		r.TglFPPP,
 		r.NoFPPP,
 		r.DeadlinePengiriman,
+		r.WaktuProduksi,
+		r.FinanceKlaes,
 		r.EndTime,
 	}
 }
@@ -28,8 +32,10 @@ func HeaderRow() []interface{} {
 		"Title Form",
 		"Divisi",
 		"Tgl FPPP",
-		"No.FPPP",
+		"No. FPPP",
 		"Deadline Pengiriman",
+		"Waktu Produksi",
+		"Finance Klaes",
 		"End Time",
 	}
 }
