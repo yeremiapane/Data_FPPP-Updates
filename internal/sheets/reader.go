@@ -39,7 +39,7 @@ func (r *Reader) ReadFormMaster() ([]model.FPPPRecord, error) {
 	header := resp.Values[0]
 	logger.Info("FORM MASTER headers: %v", header)
 	colIdx := mapColumns(header, []string{
-		"business_id", "status", "Title Form", "Divisi",
+		"business_id", "status_true", "Title Form", "Divisi",
 		"Tgl FPPP", "No. FPPP", "Deadline Pengiriman", "Deadline Pengambilan", "Waktu Produksi",
 	})
 	logger.Info("FORM MASTER column index map: %v", colIdx)
@@ -55,7 +55,7 @@ func (r *Reader) ReadFormMaster() ([]model.FPPPRecord, error) {
 		}
 
 		// Filter by status (Complete/Completed or Running)
-		status := strings.ToUpper(strings.TrimSpace(cellValue(row, colIdx["status"])))
+		status := strings.ToUpper(strings.TrimSpace(cellValue(row, colIdx["status_true"])))
 		if status != "COMPLETE" && status != "COMPLETED" && status != "RUNNING" {
 			continue
 		}
