@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -104,6 +105,20 @@ func (r *Reader) ReadFormMaster() ([]model.FPPPRecord, error) {
 
 		// Final normalize after possible fallback calculation
 		waktuProduksi = normalizeWaktuProduksi(waktuProduksi)
+
+		// Validate: Waktu Produksi must be a valid integer.
+		// If it's a non-numeric string (e.g. "Allure Carbon Black"),
+		// recalculate from dates or clear it.
+		if waktuProduksi != "" && !isNumeric(waktuProduksi) {
+			logger.Info("Waktu Produksi non-numeric value '%s' for business_id=%s, recalculating from dates", waktuProduksi, bid)
+			waktuProduksi = calcWaktuProduksi(tglFPPP, deadline)
+			waktuProduksi = normalizeWaktuProduksi(waktuProduksi)
+			// If still not numeric after recalculation, clear it
+			if waktuProduksi != "" && !isNumeric(waktuProduksi) {
+				logger.Info("Waktu Produksi still non-numeric after recalculation for business_id=%s, clearing", bid)
+				waktuProduksi = ""
+			}
+		}
 
 		records = append(records, model.FPPPRecord{
 			BusinessID:         bid,
@@ -258,4 +273,10 @@ func cellValue(row []interface{}, idx int) string {
 		return ""
 	}
 	return fmt.Sprintf("%v", row[idx])
+}
+
+// isNumeric returns true if the string represents a valid integer (including negative).
+func isNumeric(s string) bool {
+	_, err := strconv.Atoi(strings.TrimSpace(s))
+	return err == nil
 }
